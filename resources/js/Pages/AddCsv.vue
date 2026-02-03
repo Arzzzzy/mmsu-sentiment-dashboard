@@ -1,59 +1,78 @@
 <script setup>
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 // State for the UI
 const isDragging = ref(false);
-const file = ref(null);
 const processing = ref(false);
 const progress = ref(0);
 const currentStep = ref(0);
+
+// Inertia Form
+const form = useForm({
+    csv_file: null,
+});
 
 // Steps for the "Model Process" visualization
 const steps = [
     { title: 'Uploading File', icon: '📂' },
     { title: 'Cleaning Data', icon: '🧹' },
     { title: 'Extracting Sentiments', icon: '🧠' },
-    { title: 'Updating Dashboard', icon: '📊' }
+    { title: 'Saving to Database', icon: '💾' }
 ];
 
 // Handle File Selection
 const handleFile = (event) => {
     const selected = event.target.files ? event.target.files[0] : event.dataTransfer.files[0];
     if (selected && selected.type === "text/csv") {
-        file.value = selected;
-        startSimulation();
+        form.csv_file = selected;
+        uploadFile();
     } else {
         alert("Please upload a valid CSV file.");
     }
     isDragging.value = false;
 };
 
-// Simulate the Backend Process (Mock Animation)
-const startSimulation = () => {
+// Real Upload Process with UI Simulation
+const uploadFile = () => {
     processing.value = true;
     currentStep.value = 0;
     progress.value = 0;
 
+    // Start UI Animation Loop
     const interval = setInterval(() => {
-        progress.value += 1; // Increase progress bar
-        
-        // Switch steps based on progress percentage
-        if (progress.value < 30) currentStep.value = 0;
-        else if (progress.value < 60) currentStep.value = 1;
-        else if (progress.value < 90) currentStep.value = 2;
-        else currentStep.value = 3;
-
-        if (progress.value >= 100) {
-            clearInterval(interval);
-            setTimeout(() => {
-                alert("Process Complete! (Redirecting...)");
-                processing.value = false;
-                file.value = null; // Reset
-            }, 500);
+        if (progress.value < 90) {
+            progress.value += 1;
+            updateStep();
         }
-    }, 50); // Speed of simulation
+    }, 50);
+
+    // Submit to Backend
+    form.post(route('upload.csv'), {
+        onSuccess: () => {
+            clearInterval(interval);
+            progress.value = 100;
+            currentStep.value = 3;
+            setTimeout(() => {
+                alert("Success! Data labeled and saved to MySQL.");
+                processing.value = false;
+                form.reset();
+            }, 500);
+        },
+        onError: () => {
+            clearInterval(interval);
+            processing.value = false;
+            alert("Error uploading file.");
+        }
+    });
+};
+
+const updateStep = () => {
+    if (progress.value < 30) currentStep.value = 0;
+    else if (progress.value < 60) currentStep.value = 1;
+    else if (progress.value < 90) currentStep.value = 2;
+    else currentStep.value = 3;
 };
 </script>
 
@@ -63,7 +82,7 @@ const startSimulation = () => {
     <DashboardLayout>
         <div class="h-full flex flex-col">
             
-            <h2 class="font-bold text-2xl text-gray-800 mb-6">Import New Dataset</h2>
+            <h2 class="font-bold text-2xl text-gray-800 mb-6">Import New Dataset (MySQL)</h2>
 
             <div class="bg-white flex-1 rounded-[30px] p-8 shadow-sm border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden">
                 
@@ -95,14 +114,14 @@ const startSimulation = () => {
 
                     <div class="mt-8 text-center">
                         <p class="text-xs text-gray-400 uppercase tracking-widest font-bold">Supported Formats</p>
-                        <p class="text-sm text-gray-500 mt-1">.CSV (UTF-8 Encoded)</p>
+                        <p class="text-sm text-gray-500 mt-1">.CSV (Column 1 = Text)</p>
                     </div>
                 </div>
 
                 <div v-else class="w-full max-w-2xl">
                     
                     <h3 class="text-center text-xl font-bold text-gray-800 mb-8 animate-pulse">
-                        Processing Dataset...
+                        Processing & Labeling Data...
                     </h3>
 
                     <div class="relative flex justify-between items-start mb-12">
@@ -138,12 +157,12 @@ const startSimulation = () => {
                         </div>
                         <div class="flex flex-col gap-2 mt-4 opacity-90">
                             <p>> Initializing upload...</p>
-                            <p v-if="currentStep >= 0">> File received: {{ file.name }}</p>
-                            <p v-if="currentStep >= 1">> Cleaning null values...</p>
-                            <p v-if="currentStep >= 1">> Formatting text encoding...</p>
-                            <p v-if="currentStep >= 2" class="text-blue-300">> Running Sentiment Analysis Model (NLP)...</p>
-                            <p v-if="currentStep >= 2" class="text-blue-300">> Detecting emotions...</p>
-                            <p v-if="currentStep >= 3" class="text-white">> DONE. Redirecting to dashboard.</p>
+                            <p v-if="currentStep >= 0">> File received: {{ form.csv_file ? form.csv_file.name : 'Unknown' }}</p>
+                            <p v-if="currentStep >= 1">> Cleaning data stream...</p>
+                            <p v-if="currentStep >= 2" class="text-blue-300">> Running Sentiment Analysis...</p>
+                            <p v-if="currentStep >= 2" class="text-blue-300">> Labeling rows [Positive/Negative]...</p>
+                            <p v-if="currentStep >= 3" class="text-white">> INSERT INTO database...</p>
+                            <p v-if="progress >= 100" class="text-green-200">> DONE.</p>
                             <p class="animate-pulse">_</p>
                         </div>
                     </div>
