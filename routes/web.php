@@ -14,3 +14,7 @@ Route::get('/dashboard', function () {
 Route::get('/operating-units', function () {
     return Inertia::render('OperatingUnits');
 })->name('operating-units');
+
+Route::get('/add-csv', function () {
+    return Inertia::render('AddCsv');
+})->name('add-csv');
